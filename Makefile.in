@@ -1,0 +1,23 @@
+### Binary Decision Diagram (BDD) Based Set
+### Copyright (c) 2014, Sang Kil Cha
+
+SRCDIR     := @srcdir@
+TOPSRCDIR  := @top_srcdir@
+
+include $(TOPSRCDIR)/Makefile.rule
+
+all: bddset
+
+bddset:
+	@$(OCAMLBUILD) -use-ocamlfind \
+		bddSet.cmxa \
+		test.native
+
+.PHONY: all clean bddset install
+
+clean:
+	$(OCAMLBUILD) -clean
+
+install: all
+	$(INSTALL) -D _build/bddSet.cmxa $(PREFIX)/lib/bddSet.cmxa
+
