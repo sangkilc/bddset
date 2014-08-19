@@ -84,35 +84,29 @@ let cardinal set = Int64.to_int (count_sat set)
 (** check equality *)
 let equal s1 s2 = s1 == s2
 
-let get_elt path =
-  let num, _ =
-    List.fold_left (fun (num, pos) b ->
-      (if b = 0 then num else 2.0 ** pos +. num), pos +. 1.0
-    ) (0.0, 0.0) path
-  in
-  int_of_float num
+let bintoint pos num = 2.0 ** pos +. num
 
 let fold fn set acc =
-  let rec visit path lastidx set acc =
+  let rec visit num pos lastidx set acc =
+    let nextpos = pos -. 1.0 in
     match set.node with
       | Zero ->
           acc
       | One ->
           if lastidx <= !bdd_max then
-            let acc = visit (0::path) (lastidx+1) set acc in
-            visit (1::path) (lastidx+1) set acc
+            let acc = visit num nextpos (lastidx+1) set acc in
+            visit (bintoint pos num) nextpos (lastidx+1) set acc
           else
-            let elt = get_elt path in
-            fn elt acc
+            fn (int_of_float num) acc
       | Node (v, l, h) ->
           if lastidx = v then
-            let acc = visit (0::path) (lastidx+1) l acc in
-            visit (1::path) (lastidx+1) h acc
+            let acc = visit num nextpos (lastidx+1) l acc in
+            visit (bintoint pos num) nextpos (lastidx+1) h acc
           else
-            let acc = visit (0::path) (lastidx+1) set acc in
-            visit (1::path) (lastidx+1) set acc
+            let acc = visit num nextpos (lastidx+1) set acc in
+            visit (bintoint pos num) nextpos (lastidx+1) set acc
   in
-  visit [] 1 set acc
+  visit 0.0 (float_of_int (!bdd_max - 1)) 1 set acc
 
 let iter fn set =
   fold (fun elt () -> fn elt) set ()
