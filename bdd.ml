@@ -205,20 +205,21 @@ module H1 = Hashtbl.Make(Bdd)
 
 let cache_default_size = 7001
 
+let not_cache = H1.create cache_default_size
 let mk_not x =
-  let cache = H1.create cache_default_size in
   let rec mk_not_rec x =
     try
-      H1.find cache x
+      H1.find not_cache x
     with Not_found ->
       let res = match x.node with
         | Zero -> one
         | One -> zero
         | Node (v, l, h) -> mk v (mk_not_rec l) (mk_not_rec h)
       in
-      H1.add cache x res;
+      H1.add not_cache x res;
       res
   in
+  H1.clear not_cache;
   mk_not_rec x
 
 let bool_of = function Zero -> false | One -> true | _ -> invalid_arg "bool_of"
