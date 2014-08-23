@@ -43,33 +43,23 @@ let empty = zero
 
 let is_empty set = set == zero
 
-let to_binary i n =
-  let rec binloop acc i =
-    if i == 0 then acc
-    else binloop ((i mod 2 == 1)::acc) (i /2)
+let to_bdd elt =
+  let rec loop acc bitpos i =
+    if i == 0 then
+      if bitpos > 0 then loop (mk bitpos acc zero) (bitpos-1) i
+      else acc
+    else
+      if i mod 2 == 1 then loop (mk bitpos zero acc) (bitpos-1) (i/2)
+      else loop (mk bitpos acc zero) (bitpos-1) (i/2)
   in
-  let rec fillzero acc c n =
-    if c < n then fillzero (false::acc) (c+1) n
-    else if c = n then acc
-    else failwith "cannot exceed max number"
-  in
-  let r = binloop [] i in
-  fillzero r (List.length r) n
-
-let rec adder bitpos = function
-  | bit::rest ->
-     if bit then mk bitpos zero (adder (bitpos+1) rest)
-     else mk bitpos (adder (bitpos+1) rest) zero
-  | [] -> one
+  loop one !bdd_max elt
 
 let add elt set =
-  let bin = to_binary elt !bdd_max in
-  let newset = adder 1 bin in
+  let newset = to_bdd elt in
   mk_or newset set
 
 let remove elt set =
-  let bin = to_binary elt !bdd_max in
-  let newset = adder 1 bin in
+  let newset = to_bdd elt in
   let newset = mk_not newset in
   mk_and newset set
 
