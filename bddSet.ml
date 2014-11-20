@@ -23,93 +23,168 @@ open Bdd
 
 type t = Bdd.t
 
-(* maximum number of integers *)
-let max_n = ref 0
-(* maximum number of binary digits *)
-let bdd_max = ref 0
+module type S =
+sig
 
-let init n =
-  max_n := n;
-  (* x = log_2 n = log_10 n / log_10 2 *)
-  let n = float_of_int n in
-  let n = ceil ((log10 n) /. (log10 2.0)) in
-  let n = int_of_float n in
-  set_max_var n;
-  bdd_max := n
+  type elt
 
-let get_max () = !max_n
+  type t
 
-let empty = zero
+  val init : int -> unit
 
-let is_empty set = set == zero
+  (** returns the number of elements that the set can contain *)
+  val get_max : unit -> int
 
-let to_bdd elt =
-  let rec loop acc bitpos i =
-    if i == 0 then
-      if bitpos > 0 then loop (mk bitpos acc zero) (bitpos-1) i
-      else acc
-    else
-      if i mod 2 == 1 then loop (mk bitpos zero acc) (bitpos-1) (i/2)
-      else loop (mk bitpos acc zero) (bitpos-1) (i/2)
-  in
-  loop one !bdd_max elt
+  (** returns an empty set *)
+  val empty : t
 
-let add elt set =
-  let newset = to_bdd elt in
-  mk_or newset set
+  (** check if the set is empty *)
+  val is_empty : t -> bool
 
-let remove elt set =
-  let newset = to_bdd elt in
-  let newset = mk_not newset in
-  mk_and newset set
+  (** add e s adds an element e to s and returns the new set *)
+  val add : elt -> t -> t
 
-let singleton elt = add elt zero
+  (** remove x s returns a set containing all elements of s , except x *)
+  val remove : elt -> t -> t
 
-let inter s1 s2 = mk_and s1 s2
-let union s1 s2 = mk_or s1 s2
+  (** singleton elt returns a set with a single element elt *)
+  val singleton : elt -> t
 
-(** cardinality of the set = sat_count *)
-let cardinal set = Int64.to_int (count_sat set)
+  (** intersection *)
+  val inter : t -> t -> t
 
-(** check equality *)
-let equal s1 s2 = s1 == s2
+  (** union *)
+  val union : t -> t -> t
 
-let bintoint pos num = 2.0 ** pos +. num
+  (** set cardinality *)
+  val cardinal : t -> int
 
-let fold fn set acc =
-  let rec visit num pos lastidx set acc =
-    let nextpos = pos -. 1.0 in
-    match set.node with
-      | Zero ->
-          acc
-      | One ->
-          if lastidx <= !bdd_max then
-            let acc = visit num nextpos (lastidx+1) set acc in
-            visit (bintoint pos num) nextpos (lastidx+1) set acc
-          else
-            fn (int_of_float num) acc
-      | Node (v, l, h) ->
-          if lastidx = v then
-            let acc = visit num nextpos (lastidx+1) l acc in
-            visit (bintoint pos num) nextpos (lastidx+1) h acc
-          else
-            let acc = visit num nextpos (lastidx+1) set acc in
-            visit (bintoint pos num) nextpos (lastidx+1) set acc
-  in
-  visit 0.0 (float_of_int (!bdd_max - 1)) 1 set acc
+  (** check equality *)
+  val equal : t -> t -> bool
 
-let iter fn set =
-  fold (fun elt () -> fn elt) set ()
+  (** iterate *)
+  val iter : (elt -> unit) -> t -> unit
 
-let print_bddstat chan =
-  let arr = stats () in
-  let livecnt, totalcnt =
-    Array.fold_left (fun (liveacc, totalacc) (_, livecnt, totlen, sm, md, lg) ->
-      (* Printf.printf "%d,%d,%d;;" sm md lg; *)
-      liveacc + livecnt, totalacc + totlen
-    ) (0,0) arr
-  in
-  Printf.fprintf chan "live = %10d, total = %10d\n" livecnt totalcnt
+  (** fold *)
+  val fold : (elt -> 'a -> 'a) -> t -> 'a -> 'a
 
-let print_to_dot = print_to_dot
+  (** visualize the current set in BDD *)
+  val print_to_dot : t -> file:string -> unit
+
+  (** dump internal bdd stat *)
+  val print_bddstat : Pervasives.out_channel -> unit
+
+end
+
+module type IntMappedType =
+sig
+
+  (** The type of the set elements *)
+  type t
+
+  val to_int : t -> int
+
+  val of_int : int -> t
+
+end
+
+module Make(T: IntMappedType) =
+struct
+
+  type elt = T.t
+
+  type t = Bdd.t
+
+  (* maximum number of integers *)
+  let max_n = ref 0
+  (* maximum number of binary digits *)
+  let bdd_max = ref 0
+
+  let init n =
+    max_n := n;
+    (* x = log_2 n = log_10 n / log_10 2 *)
+    let n = float_of_int n in
+    let n = ceil ((log10 n) /. (log10 2.0)) in
+    let n = int_of_float n in
+    set_max_var n;
+    bdd_max := n
+
+  let get_max () = !max_n
+
+  let empty = zero
+
+  let is_empty set = set == zero
+
+  let to_bdd elt =
+    let rec loop acc bitpos i =
+      if i == 0 then
+        if bitpos > 0 then loop (mk bitpos acc zero) (bitpos-1) i
+        else acc
+      else
+        if i mod 2 == 1 then loop (mk bitpos zero acc) (bitpos-1) (i/2)
+        else loop (mk bitpos acc zero) (bitpos-1) (i/2)
+    in
+    loop one !bdd_max (T.to_int elt)
+
+  let add elt set =
+    let newset = to_bdd elt in
+    mk_or newset set
+
+  let remove elt set =
+    let newset = to_bdd elt in
+    let newset = mk_not newset in
+    mk_and newset set
+
+  let singleton elt = add elt zero
+
+  let inter s1 s2 = mk_and s1 s2
+  let union s1 s2 = mk_or s1 s2
+
+  (** cardinality of the set = sat_count *)
+  let cardinal set = Int64.to_int (count_sat set)
+
+  (** check equality *)
+  let equal s1 s2 = s1 == s2
+
+  let bintoint pos num = 2.0 ** pos +. num
+
+  let fold fn set acc =
+    let rec visit num pos lastidx set acc =
+      let nextpos = pos -. 1.0 in
+      match set.node with
+        | Zero ->
+            acc
+        | One ->
+            if lastidx <= !bdd_max then
+              let acc = visit num nextpos (lastidx+1) set acc in
+              visit (bintoint pos num) nextpos (lastidx+1) set acc
+            else
+              fn (T.of_int (int_of_float num)) acc
+        | Node (v, l, h) ->
+            if lastidx = v then
+              let acc = visit num nextpos (lastidx+1) l acc in
+              visit (bintoint pos num) nextpos (lastidx+1) h acc
+            else
+              let acc = visit num nextpos (lastidx+1) set acc in
+              visit (bintoint pos num) nextpos (lastidx+1) set acc
+    in
+    visit 0.0 (float_of_int (!bdd_max - 1)) 1 set acc
+
+  let iter fn set =
+    fold (fun elt () -> fn elt) set ()
+
+  let print_bddstat chan =
+    let arr = stats () in
+    let livecnt, totalcnt =
+      Array.fold_left
+        (fun (liveacc, totalacc) (_, livecnt, totlen, sm, md, lg) ->
+          (* Printf.printf "%d,%d,%d;;" sm md lg; *)
+          liveacc + livecnt, totalacc + totlen
+        ) (0,0) arr
+    in
+    Printf.fprintf chan "live = %10d, total = %10d\n" livecnt totalcnt
+
+  let print_to_dot = print_to_dot
+
+end
 

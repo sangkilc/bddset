@@ -19,50 +19,76 @@
 (*                                                                        *)
 (**************************************************************************)
 
+(** abstract data type for BDD Integer Set *)
 type t
 
-(** init n initializes BddSet to have the maximum n elements *)
-val init : int -> unit
+module type S =
+sig
 
-(** returns the number of elements that the set can contain *)
-val get_max : unit -> int
+  type elt
 
-(** returns an empty set *)
-val empty : t
+  type t
 
-(** check if the set is empty *)
-val is_empty : t -> bool
+  (** init n initializes BddSet to have the maximum n elements *)
+  val init : int -> unit
 
-(** add e s adds an element e to s and returns the new set *)
-val add : int -> t -> t
+  (** returns the number of elements that the set can contain *)
+  val get_max : unit -> int
 
-(** remove x s returns a set containing all elements of s , except x *)
-val remove : int -> t -> t
+  (** returns an empty set *)
+  val empty : t
 
-(** singleton elt returns a set with a single element elt *)
-val singleton : int -> t
+  (** check if the set is empty *)
+  val is_empty : t -> bool
 
-(** intersection *)
-val inter : t -> t -> t
+  (** add e s adds an element e to s and returns the new set *)
+  val add : elt -> t -> t
 
-(** union *)
-val union : t -> t -> t
+  (** remove x s returns a set containing all elements of s , except x *)
+  val remove : elt -> t -> t
 
-(** set cardinality *)
-val cardinal : t -> int
+  (** singleton elt returns a set with a single element elt *)
+  val singleton : elt -> t
 
-(** check equality *)
-val equal : t -> t -> bool
+  (** intersection *)
+  val inter : t -> t -> t
 
-(** iterate *)
-val iter : (int -> unit) -> t -> unit
+  (** union *)
+  val union : t -> t -> t
 
-(** fold *)
-val fold : (int -> 'a -> 'a) -> t -> 'a -> 'a
+  (** set cardinality *)
+  val cardinal : t -> int
 
-(** visualize the current set in BDD *)
-val print_to_dot : t -> file:string -> unit
+  (** check equality *)
+  val equal : t -> t -> bool
 
-(** dump internal bdd stat *)
-val print_bddstat : Pervasives.out_channel -> unit
+  (** iterate *)
+  val iter : (elt -> unit) -> t -> unit
+
+  (** fold *)
+  val fold : (elt -> 'a -> 'a) -> t -> 'a -> 'a
+
+  (** visualize the current set in BDD *)
+  val print_to_dot : t -> file:string -> unit
+
+  (** dump internal bdd stat *)
+  val print_bddstat : Pervasives.out_channel -> unit
+
+end
+
+(** An integer representation. currently, BddSet only works with an element type
+    that has an one-to-one mapping with an integer *)
+module type IntMappedType =
+sig
+
+  (** The type of the set elements *)
+  type t
+
+  val to_int : t -> int
+
+  val of_int : int -> t
+
+end
+
+module Make(T: IntMappedType) : S with type elt = T.t
 
